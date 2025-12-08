@@ -35,6 +35,10 @@ extern "C" {
     _originalView = view;
 }
 
+- (void)setImeInstance:(ofxIME *)ime {
+    _imeInstance = ime;
+}
+
 // Forward key events to IME and original view
 - (void)keyDown:(NSEvent *)event {
     // Reset flag before processing

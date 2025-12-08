@@ -4,10 +4,7 @@ ofxIME::ofxIME() {
     ofSetEscapeQuitsApp(false);
     state = Eisu;
     clear();
-#ifdef __APPLE__
-    imeInputView = nullptr;
-    originalContentView = nullptr;
-#endif
+    // 静的メンバはofxIME_mac.mmで初期化済み
 }
 
 ofxIME::~ofxIME() {
@@ -156,7 +153,8 @@ void ofxIME::mousePressed(ofMouseEventArgs &mouse) {
 }
 
 void ofxIME::setCursorByMouse(float x, float y) {
-    auto bbox = font.getStringBoundingBox(getString(), lastDrawPos.x, lastDrawPos.y);
+    ofTrueTypeFont& f = getFont();
+    auto bbox = f.getStringBoundingBox(getString(), lastDrawPos.x, lastDrawPos.y);
 
     // Check if click is inside bbox
     if (!bbox.inside(x, y)) return;
@@ -167,7 +165,7 @@ void ofxIME::setCursorByMouse(float x, float y) {
     lineNumber = MIN(lineNumber, (int)line.size() - 1);
 
     // Find clicked character
-    auto lineBbox = font.getStringBoundingBox(UTF32toUTF8(line[lineNumber]), lastDrawPos.x, lastDrawPos.y + font.getLineHeight() * lineNumber);
+    auto lineBbox = f.getStringBoundingBox(UTF32toUTF8(line[lineNumber]), lastDrawPos.x, lastDrawPos.y + f.getLineHeight() * lineNumber);
     int posNumber = ofMap(x, 0, lineBbox.width, 0, line[lineNumber].size());
     posNumber = MIN(posNumber, (int)line[cursorLine].size());
 
@@ -230,6 +228,11 @@ void ofxIME::setFont(string path, float fontSize) {
     settings.addRange(ofUnicode::KatakanaHalfAndFullwidthForms);
     settings.addRange(ofUnicode::range{0x3000, 0x303F}); // CJK symbols and punctuation
     font.load(settings);
+    fontPtr = nullptr;  // 自前フォントを使用
+}
+
+void ofxIME::setFont(ofTrueTypeFont* sharedFont) {
+    fontPtr = sharedFont;
 }
 
 void ofxIME::draw(ofPoint pos) {
@@ -237,7 +240,8 @@ void ofxIME::draw(ofPoint pos) {
 }
 
 void ofxIME::draw(float x, float y) {
-    if (!font.isLoaded()) {
+    ofTrueTypeFont& f = getFont();
+    if (!f.isLoaded()) {
         ofLogError("ofxIME") << "font is not loaded.";
         return;
     }
@@ -248,8 +252,8 @@ void ofxIME::draw(float x, float y) {
     // Animation easing effect
     movingY *= 0.7;
 
-    float fontSize = font.getSize();
-    float lineHeight = font.getLineHeight();
+    float fontSize = f.getSize();
+    float lineHeight = f.getLineHeight();
     float margin = fontSize * 0.1;
 
     // Cursor drawing function
@@ -268,7 +272,7 @@ void ofxIME::draw(float x, float y) {
         // Check if this is the current input line
         if (i != cursorLine) {
             // Non-active line
-            font.drawString(UTF32toUTF8(line[i]), 0, 0);
+            f.drawString(UTF32toUTF8(line[i]), 0, 0);
         }
         else {
             // Current input line
@@ -276,8 +280,8 @@ void ofxIME::draw(float x, float y) {
 
             // Confirmed text before cursor
             string beforeCursor = getLineSubstr(cursorLine, 0, cursorPos);
-            font.drawString(beforeCursor, 0, 0);
-            float beforeW = font.stringWidth(beforeCursor);
+            f.drawString(beforeCursor, 0, 0);
+            float beforeW = f.stringWidth(beforeCursor);
 
             ofTranslate(beforeW, 0);
 
@@ -286,18 +290,18 @@ void ofxIME::draw(float x, float y) {
                 ofTranslate(margin, 0);
 
                 string markedStr = getMarkedText();
-                font.drawString(markedStr, 0, 0);
-                float markedW = font.stringWidth(markedStr);
+                f.drawString(markedStr, 0, 0);
+                float markedW = f.stringWidth(markedStr);
 
                 // Draw underlines for marked text segments
                 // First, draw thin underline for non-selected part (before selection)
                 string selStart = getMarkedTextSubstr(0, markedSelectedLocation);
-                float selStartW = font.stringWidth(selStart);
+                float selStartW = f.stringWidth(selStart);
 
                 if (markedSelectedLength > 0) {
                     // There is a selected range
                     string selText = getMarkedTextSubstr(markedSelectedLocation, markedSelectedLength);
-                    float selW = font.stringWidth(selText);
+                    float selW = f.stringWidth(selText);
 
                     // Thin underline before selection
                     if (selStartW > 0) {
@@ -323,7 +327,7 @@ void ofxIME::draw(float x, float y) {
 
                 // Draw conversion candidates
                 if (candidates.size() > 0) {
-                    float lh = font.getLineHeight();
+                    float lh = f.getLineHeight();
                     ofPushMatrix();
                     ofTranslate(0, lh);  // Display below marked text
 
@@ -335,12 +339,12 @@ void ofxIME::draw(float x, float y) {
                             ofPushStyle();
                             ofFill();
                             ofSetColor(100, 150);
-                            float candW = font.stringWidth(candStr);
+                            float candW = f.stringWidth(candStr);
                             ofDrawRectangle(-2, -fontSize, candW + 4, lh);
                             ofPopStyle();
                         }
 
-                        font.drawString(candStr, 0, 0);
+                        f.drawString(candStr, 0, 0);
                         ofTranslate(0, lh);
                     }
                     ofPopMatrix();
@@ -355,7 +359,7 @@ void ofxIME::draw(float x, float y) {
 
             // Confirmed text after cursor
             string afterCursor = getLineSubstr(cursorLine, cursorPos, (int)line[cursorLine].length() - cursorPos);
-            font.drawString(afterCursor, 0, 0);
+            f.drawString(afterCursor, 0, 0);
 
             ofPopMatrix();
         }
@@ -431,15 +435,16 @@ void ofxIME::clearCandidates() {
 
 // Return screen coordinates for IME candidate window positioning
 ofVec2f ofxIME::getMarkedTextScreenPosition() {
+    ofTrueTypeFont& f = getFont();
     float x = lastDrawPos.x;
     float y = lastDrawPos.y;
 
     // Calculate Y coordinate for current line
-    y += font.getLineHeight() * cursorLine;
+    y += f.getLineHeight() * cursorLine;
 
     // Calculate X coordinate for cursor position
     string beforeCursor = getLineSubstr(cursorLine, 0, cursorPos);
-    x += font.stringWidth(beforeCursor);
+    x += f.stringWidth(beforeCursor);
 
     return ofVec2f(x, y);
 }

@@ -24,6 +24,7 @@ class ofxIME;
 
 - (instancetype)initWithFrame:(NSRect)frameRect imeInstance:(ofxIME*)ime;
 - (void)setOriginalView:(NSView *)view;
+- (void)setImeInstance:(ofxIME*)ime;
 
 @end
 

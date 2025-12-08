@@ -12,6 +12,12 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
+// 静的メンバの定義
+void* ofxIME::sharedIMEView = nullptr;
+void* ofxIME::sharedOriginalContentView = nullptr;
+ofxIME* ofxIME::activeIMEInstance = nullptr;
+int ofxIME::imeViewRefCount = 0;
+
 void ofxIME::startIMEObserver() {
     CFNotificationCenterAddObserver(
         CFNotificationCenterGetDistributedCenter(),
@@ -75,7 +81,14 @@ void ofxIME::syncWithSystemIME() {
 }
 
 void ofxIME::setupIMEInputView() {
-    if (imeInputView != nullptr) return;
+    // 参照カウントを増やす
+    imeViewRefCount++;
+
+    // 既にViewが存在する場合は、このインスタンスをアクティブにするだけ
+    if (sharedIMEView != nullptr) {
+        becomeActiveIME();
+        return;
+    }
 
     // GLFWウィンドウからNSWindowを取得
     GLFWwindow* glfwWin = (GLFWwindow*)ofGetWindowPtr()->getWindowContext();
@@ -87,15 +100,16 @@ void ofxIME::setupIMEInputView() {
     NSView* contentView = [nsWindow contentView];
     if (!contentView) return;
 
-    // 元のcontentViewを保存
-    originalContentView = (__bridge void*)contentView;
+    // 元のcontentViewを保存（グローバル）
+    sharedOriginalContentView = (__bridge void*)contentView;
 
-    // カスタムViewを作成（ofxIMEへの参照を渡す）
+    // カスタムViewを作成（このインスタンスへの参照を渡す）
     ofxIMEView* customView = [[ofxIMEView alloc] initWithFrame:[contentView frame] imeInstance:this];
     [customView setOriginalView:contentView];
     [customView setAutoresizingMask:[contentView autoresizingMask]];
 
-    imeInputView = (__bridge_retained void*)customView;
+    sharedIMEView = (__bridge_retained void*)customView;
+    activeIMEInstance = this;
 
     // contentViewの上にカスタムViewを追加してFirstResponderにする
     [contentView addSubview:customView];
@@ -103,23 +117,46 @@ void ofxIME::setupIMEInputView() {
 }
 
 void ofxIME::removeIMEInputView() {
-    if (imeInputView == nullptr) return;
+    // 参照カウントを減らす
+    imeViewRefCount--;
 
-    ofxIMEView* customView = (__bridge_transfer ofxIMEView*)imeInputView;
-    imeInputView = nullptr;
+    // まだ他のIMEが使用中なら削除しない
+    if (imeViewRefCount > 0) {
+        // このインスタンスがアクティブだった場合、アクティブを解除
+        if (activeIMEInstance == this) {
+            activeIMEInstance = nullptr;
+        }
+        return;
+    }
+
+    // 最後のIMEがdisableされたのでViewを削除
+    if (sharedIMEView == nullptr) return;
+
+    ofxIMEView* customView = (__bridge_transfer ofxIMEView*)sharedIMEView;
+    sharedIMEView = nullptr;
+    activeIMEInstance = nullptr;
 
     // カスタムViewを削除
     [customView removeFromSuperview];
 
     // 元のcontentViewをFirstResponderに戻す
-    if (originalContentView != nullptr) {
-        NSView* origView = (__bridge NSView*)originalContentView;
+    if (sharedOriginalContentView != nullptr) {
+        NSView* origView = (__bridge NSView*)sharedOriginalContentView;
         NSWindow* nsWindow = [origView window];
         if (nsWindow) {
             [nsWindow makeFirstResponder:origView];
         }
-        originalContentView = nullptr;
+        sharedOriginalContentView = nullptr;
     }
+}
+
+void ofxIME::becomeActiveIME() {
+    if (sharedIMEView == nullptr) return;
+
+    // ViewのimeInstanceを自分に差し替える
+    ofxIMEView* customView = (__bridge ofxIMEView*)sharedIMEView;
+    [customView setImeInstance:this];
+    activeIMEInstance = this;
 }
 
 // C-style callback functions for ofxIMEView (to avoid header conflicts)
