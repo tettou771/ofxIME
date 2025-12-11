@@ -5,20 +5,20 @@
 #import "ofxIMEView.h"
 #include <vector>
 
-// Forward declaration - we'll use extern functions to call ofxIME methods
-class ofxIME;
+// Forward declaration - we'll use extern functions to call ofxIMEBase methods
+class ofxIMEBase;
 
 // C++ helper functions (implemented in ofxIME_mac.mm)
 extern "C" {
-    void ofxIME_insertText(ofxIME* ime, const char32_t* str, size_t len);
-    void ofxIME_setMarkedText(ofxIME* ime, const char32_t* str, size_t len, int selLoc, int selLen);
-    void ofxIME_unmarkText(ofxIME* ime);
-    void ofxIME_getMarkedTextScreenPosition(ofxIME* ime, float* x, float* y);
+    void ofxIME_insertText(ofxIMEBase* ime, const char32_t* str, size_t len);
+    void ofxIME_setMarkedText(ofxIMEBase* ime, const char32_t* str, size_t len, int selLoc, int selLen);
+    void ofxIME_unmarkText(ofxIMEBase* ime);
+    void ofxIME_getMarkedTextScreenPosition(ofxIMEBase* ime, float* x, float* y);
 }
 
 @implementation ofxIMEView
 
-- (instancetype)initWithFrame:(NSRect)frameRect imeInstance:(ofxIME*)ime {
+- (instancetype)initWithFrame:(NSRect)frameRect imeInstance:(ofxIMEBase*)ime {
     self = [super initWithFrame:frameRect];
     if (self) {
         _originalView = nil;
@@ -35,7 +35,7 @@ extern "C" {
     _originalView = view;
 }
 
-- (void)setImeInstance:(ofxIME *)ime {
+- (void)setImeInstance:(ofxIMEBase *)ime {
     _imeInstance = ime;
 }
 

@@ -13,12 +13,12 @@
 #include <GLFW/glfw3native.h>
 
 // 静的メンバの定義
-void* ofxIME::sharedIMEView = nullptr;
-void* ofxIME::sharedOriginalContentView = nullptr;
-ofxIME* ofxIME::activeIMEInstance = nullptr;
-int ofxIME::imeViewRefCount = 0;
+void* ofxIMEBase::sharedIMEView = nullptr;
+void* ofxIMEBase::sharedOriginalContentView = nullptr;
+ofxIMEBase* ofxIMEBase::activeIMEInstance = nullptr;
+int ofxIMEBase::imeViewRefCount = 0;
 
-void ofxIME::startIMEObserver() {
+void ofxIMEBase::startIMEObserver() {
     CFNotificationCenterAddObserver(
         CFNotificationCenterGetDistributedCenter(),
         this,
@@ -32,7 +32,7 @@ void ofxIME::startIMEObserver() {
     syncWithSystemIME();
 }
 
-void ofxIME::stopIMEObserver() {
+void ofxIMEBase::stopIMEObserver() {
     CFNotificationCenterRemoveObserver(
         CFNotificationCenterGetDistributedCenter(),
         this,
@@ -41,19 +41,19 @@ void ofxIME::stopIMEObserver() {
     );
 }
 
-void ofxIME::onInputSourceChanged(CFNotificationCenterRef center,
+void ofxIMEBase::onInputSourceChanged(CFNotificationCenterRef center,
                                   void *observer,
                                   CFNotificationName name,
                                   const void *object,
                                   CFDictionaryRef userInfo) {
-    // observerはofxIMEインスタンスへのポインタ
-    ofxIME *ime = static_cast<ofxIME*>(observer);
+    // observerはofxIMEBaseインスタンスへのポインタ
+    ofxIMEBase *ime = static_cast<ofxIMEBase*>(observer);
     if (ime) {
         ime->syncWithSystemIME();
     }
 }
 
-void ofxIME::syncWithSystemIME() {
+void ofxIMEBase::syncWithSystemIME() {
     TISInputSourceRef source = TISCopyCurrentKeyboardInputSource();
     if (source) {
         CFStringRef sourceID = (CFStringRef)TISGetInputSourceProperty(source, kTISPropertyInputSourceID);
@@ -80,7 +80,7 @@ void ofxIME::syncWithSystemIME() {
     }
 }
 
-void ofxIME::setupIMEInputView() {
+void ofxIMEBase::setupIMEInputView() {
     // 参照カウントを増やす
     imeViewRefCount++;
 
@@ -116,7 +116,7 @@ void ofxIME::setupIMEInputView() {
     [nsWindow makeFirstResponder:customView];
 }
 
-void ofxIME::removeIMEInputView() {
+void ofxIMEBase::removeIMEInputView() {
     // 参照カウントを減らす
     imeViewRefCount--;
 
@@ -150,7 +150,7 @@ void ofxIME::removeIMEInputView() {
     }
 }
 
-void ofxIME::becomeActiveIME() {
+void ofxIMEBase::becomeActiveIME() {
     if (sharedIMEView == nullptr) return;
 
     // ViewのimeInstanceを自分に差し替える
@@ -162,27 +162,27 @@ void ofxIME::becomeActiveIME() {
 // C-style callback functions for ofxIMEView (to avoid header conflicts)
 extern "C" {
 
-void ofxIME_insertText(ofxIME* ime, const char32_t* str, size_t len) {
+void ofxIME_insertText(ofxIMEBase* ime, const char32_t* str, size_t len) {
     if (ime && str) {
         u32string u32str(str, len);
         ime->insertText(u32str);
     }
 }
 
-void ofxIME_setMarkedText(ofxIME* ime, const char32_t* str, size_t len, int selLoc, int selLen) {
+void ofxIME_setMarkedText(ofxIMEBase* ime, const char32_t* str, size_t len, int selLoc, int selLen) {
     if (ime) {
         u32string u32str(str, len);
         ime->setMarkedTextFromOS(u32str, selLoc, selLen);
     }
 }
 
-void ofxIME_unmarkText(ofxIME* ime) {
+void ofxIME_unmarkText(ofxIMEBase* ime) {
     if (ime) {
         ime->unmarkText();
     }
 }
 
-void ofxIME_getMarkedTextScreenPosition(ofxIME* ime, float* x, float* y) {
+void ofxIME_getMarkedTextScreenPosition(ofxIMEBase* ime, float* x, float* y) {
     if (ime && x && y) {
         ofVec2f pos = ime->getMarkedTextScreenPosition();
         *x = pos.x;

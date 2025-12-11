@@ -5,14 +5,14 @@
 #import <Cocoa/Cocoa.h>
 
 // 前方宣言
-class ofxIME;
+class ofxIMEBase;
 
 // NSTextInputClientプロトコルを実装したNSView
-// OSのIMEから入力を受け取り、ofxIMEに渡す
+// OSのIMEから入力を受け取り、ofxIMEBaseに渡す
 @interface ofxIMEView : NSView <NSTextInputClient>
 
 @property (nonatomic, weak) NSView *originalView;
-@property (nonatomic, assign) ofxIME *imeInstance;
+@property (nonatomic, assign) ofxIMEBase *imeInstance;
 
 // 未確定文字列を保持
 @property (nonatomic, strong) NSMutableAttributedString *markedTextStorage;
@@ -22,9 +22,9 @@ class ofxIME;
 // IMEが文字を処理したかどうかのフラグ
 @property (nonatomic, assign) BOOL handledByIME;
 
-- (instancetype)initWithFrame:(NSRect)frameRect imeInstance:(ofxIME*)ime;
+- (instancetype)initWithFrame:(NSRect)frameRect imeInstance:(ofxIMEBase*)ime;
 - (void)setOriginalView:(NSView *)view;
-- (void)setImeInstance:(ofxIME*)ime;
+- (void)setImeInstance:(ofxIMEBase*)ime;
 
 @end
 
